@@ -1,11 +1,12 @@
 use image::{imageops::FilterType::Gaussian, GenericImageView, ImageError, Rgba};
 
-use std::{collections::HashMap, env, io, process};
+use std::{collections::HashMap, env, process};
 
 type XyA = Vec<((u32, u32), u8)>;
 type XyRgb = Vec<((u32, u32), (u8, u8, u8))>;
 type XyRgba = Vec<((u32, u32), (u8, u8, u8, u8))>;
 type XyIRgb = Vec<((u32, u32), f64, (u8, u8, u8))>;
+
 pub trait Image {
     fn take_saturation(&self) -> XyA;
     fn take_color(&self) -> XyRgb;
@@ -16,32 +17,10 @@ pub trait Image {
 pub struct Img {
     body: Vec<Pixel>,
 }
-// # Welcome to RASCII!
-// this is an img2ascii tool fully written in rust!
 
-/// # Implented for:
-///
-/// creating a custom data type that represents a pixel in an image
-///
-/// #Contains:
-///
-/// ((posx, posy), (r, g, b, a))
-///
-/// # Destruction:
-///
-/// You could destructure it with public structs or (I will create methods for this [I hope so :D])
 #[derive(Debug)]
 pub struct Pixel((u32, u32), (u8, u8, u8, u8));
 
-/// # Implented for:
-///
-/// to be able to take inner struct values easily.
-///
-/// # Contains:
-///
-/// I thought that it would be better to have positions (x, y) in first element.
-///
-/// Look at the code! you'll understand better.
 impl Image for Img {
     fn take_saturation(&self) -> Vec<((u32, u32), u8)> {
         let mut result = Vec::new();
@@ -75,30 +54,123 @@ impl Img {
     }
 }
 
-/// Allows you to take input from standard input.
-pub fn take_input(reference: &mut String) -> Result<usize, io::Error> {
-    io::stdin().read_line(reference)
+
+// returns found sub_commands
+mod search {
+    use std::fmt;
+
+    #[derive(Debug)]
+    pub struct SearchError(String); // custom error type that returns an error message.
+    
+    impl fmt::Display for SearchError {
+        fn fmt (&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    pub fn search_exact_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> bool {
+        let mut bool_list = Vec::with_capacity(search_list.len());
+        for command in search_list {
+            bool_list.push(sub_command_list.contains(&command.to_string()));
+        }
+        !bool_list.iter().any(|i| *i == false) // capturing false value if exists!
+    }
+
+    pub fn search_any_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> bool {
+        let mut bool_list = Vec::with_capacity(search_list.len());
+        for command in search_list {
+            bool_list.push(sub_command_list.contains(&command.to_string()));
+        }
+        bool_list.iter().any(|i| *i == true) // capturing true value if exists!
+    }
+    
+    pub fn index_exact_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> Result<Vec<(String, usize)>, SearchError> { // returns all subcommands and their indexes, If exists! Else it panics.
+        if !search_exact_sub_command(search_list, sub_command_list) { // if not all elements pair:
+            Err(SearchError(String::from("Keywords and search list does not match! You can only find indexes from existing keywords!")))
+        } // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
+        else {
+            let mut sub_command_index_list:Vec<(String, usize)> = Vec::with_capacity(search_list.len());
+            search_list.iter().for_each(|key| {
+                sub_command_index_list.push((key.to_string(), sub_command_list.iter().position(|x| x == key).expect("Couldn't pair keyword! Lists doesn't match!") )); // it has to panic if lists does not pair!
+            });
+            Ok(sub_command_index_list)
+        }
+    }
+
+    pub fn index_any_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> Result<(String, usize), SearchError> { // returns the index of first satisfied subcommand, If exists!
+        if !search_any_sub_command(search_list, sub_command_list) { // If no pair:
+            Err(SearchError(String::from("Keywords and search list does not match! You can only find indexes from existing keywords!")))
+        } // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
+        else {
+            let mut ret = Err(SearchError(String::from("Couldn't find a pair"))); // Default value will be mutated if any pairs gets detected.
+            search_list.iter().for_each(|key| {
+                if sub_command_list.iter().any(|i| i == key) {
+                    ret = Ok((key.to_string(), sub_command_list.iter().position(|x| x == key).expect("Couldn't pair keyword! Lists doesn't match!"))) // have to fix these panics later!
+                }
+            });
+            ret
+        }
+
+        // for keyword in search_list {
+        //     if sub_command_list.iter().any(|i| i == keyword) {
+        //         Ok((keyword.to_string(), sub_command_list.iter().position(|x| x == keyword ).expect("Couldn't pair keyword! Lists doesn't match!"))) // it has to panic if lists does not pair!
+        //     }
+        // }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_search_any_sub_command() {
+            let search_list_true = vec!["-h", "--help", "--path"];
+            let search_list_false = vec!["--no-help-here", "--help", "--path"];
+            let sub_command_list= vec![String::from("-h")];
+
+            assert!(search_any_sub_command(&search_list_true, &sub_command_list) == true);
+            assert!(search_any_sub_command(&search_list_false, &sub_command_list) == false);
+        }
+        
+        #[test]
+        fn test_search_exact_sub_command() {
+            let search_list_true = vec!["-h", "--path"];
+            let search_list_false = vec!["-h", "--help", "--path-is-absend"];
+            let sub_command_list= vec![String::from("-h"), String::from("--path"), String::from("--another-subcommand")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+
+            assert!(search_exact_sub_command(&search_list_true, &sub_command_list) == true);
+            assert!(search_exact_sub_command(&search_list_false, &sub_command_list) == false);
+        }
+
+        #[test]
+        fn test_index_any_sub_command() {
+            let search_list_true = vec!["-h", "--path", "-no-sense"];
+            let search_list_false = vec!["--help", "--path-is-absend"];
+            let sub_command_list= vec![String::from("-h"), String::from("--path"), String::from("--another-subcommand")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+
+            assert!(dbg!(index_any_sub_command(&search_list_true, &sub_command_list).unwrap()) == (String::from("--path"), 1_usize)); // now it finds the last one, I did not changed it to for loop to be able to break the loop, this is just personal decision.
+        }
+        #[test]
+        fn test_index_exact_sub_command() {
+            let search_list_true = vec!["-h", "--path"];
+            let search_list_true_2 = vec!["-h"];
+            let sub_command_list= vec![String::from("-h"), String::from("--path")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+
+            assert!(dbg!(index_exact_sub_command(&search_list_true, &sub_command_list).unwrap()) == vec![(String::from("-h"), 0_usize), (String::from("--path"), 1_usize)]);
+            assert!(dbg!(index_exact_sub_command(&search_list_true_2, &sub_command_list).unwrap() == vec![(String::from("-h"), 0_usize)]));
+            // false option is going to be tested after I clear expect(...) -> It panics now!
+        }
+    }
 }
 
-/// # This function returns all pixels in the given path
-///
-/// Its Important to know `&path[..&path.len()-1]` does not include last 2 elements of path!
-///
-/// But why would we want to do this?
-///
-/// Because when you press <enter> on terminal to actually register the path, You are placing
-///
-/// an additional `\n` to input! This is the reason I am not including last 2 elements.
-///
-/// # Functionality:
-///
-/// This decodes image in the path. also also translates the image output to standard Vec.
+mod prelude {
+    use super::*;
 
-pub fn convert() -> String {
-    let sub_commands = read_env_args();
-    if sub_commands.len() < 2 {
-        println!(
-            "
+    pub fn convert() -> String {
+        let sub_commands = read_env_args();
+        if sub_commands.len() < 2 {
+            println!(
+                "
    'l_?]]?<:     .;~?]]]]-<;.                                 ':i+-?]]]]~   ![~   ']]\"
   :(/-!;I>[f?.  I(/[>l;;l>[/);                              ^-(1->lI;;;;\"   ]c(.  \"rul
  ]n>     `|xI  ,tfl        !j/\"                            ^(j<'            ]c(.  \"rul
@@ -116,29 +188,29 @@ pub fn convert() -> String {
             let pixelated = sub_commands
             .iter()
             .any(|i| i == "-px" || i == "--pixelated");
-    let with_color = sub_commands
-    .iter()
-    .any(|i| i == "-wc" || i == "--with_color");
-    let full_background = sub_commands
-    .iter()
-    .any(|i| i == "-bg" || i == "--background");
-    let reverse = sub_commands.iter().any(|i| i == "-i" || i == "--invert");
-    let colored = sub_commands
-    .iter()
-    .any(|i| i == "-c" || i == "--colored" || i == "--color");
-    let supported_char_lists = HashMap::from([ // List of available char_lists to be used on conversion:
-        ("japanese", "ッツヅミテデトドナぁあぃいぅうぇえぉおかがきぎけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕゖ゛゜ゝゞゟ゠ァアィイカガキギクグケゲコゴサザシジスズセゼソゾタダチヂニヌネノハバパヒビピフブプヘベペホボポマムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶヷヸヹヺヾくぐゥウェエォオ、。"),
-        ("chinese", "厅和酒店等私空间安装面部识别摄像头在个案例中调查发现东南部福建省福州市的公安希望在美国酒店品牌戴斯酒店特许经营店的大堂内安装摄像头酒店前台经理告诉纽约时报摄像头没有脸识别功能也没有和公安网络联网文件显示福州市公安局还要求接家当地喜来登酒店内的视频监控资，。，。"),
-        ("russian", "АБВГДЕЁЖЗИЙКЛМНОПPСТУФХЦЧШЩЪЫЬЭЮЯ  "),
-        // ("hindi", "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहक्त्ज्ञ"), //this does not work bcuz hindi
-        // chars are dependent to each other, so there is no linear ratio!
-        // all lines has to contain same amount of pixels!
-        // but hindi chars have dependent width!
-        // thats why I am not doing it!
-        ("emoji", "😆😅🤣😉😊😋🤩😝🤑🤐🤗😛🧐😶😐🙄😠🤬😡😔🙁😫😩😮😱😨😰😯😓😭🤕🤢🤮🥵🥶🥳🥸😴💤🤡👹🦀👺💀👻👽👾😺🙀😿😾🙌🤛🤚👊🤞🤘👌🤏💪🦾🦿🤝🙏👆🖖💅🤳👄🦀👿🦀👅👂🦻👃🧠🫀🫁🦷🦴👁👀👤👥🗣👶🧔，。"),
-        ("ansi", "█▓▒░ "),
-        ("slight", "$@%8W*adpLY\\|){[?_~>!I:\"`.   "),
-    ]); // contains supported char_lists
+        let with_color = sub_commands
+        .iter()
+        .any(|i| i == "-wc" || i == "--with_color");
+        let full_background = sub_commands
+        .iter()
+        .any(|i| i == "-bg" || i == "--background");
+        let reverse = sub_commands.iter().any(|i| i == "-i" || i == "--invert");
+        let colored = sub_commands
+        .iter()
+        .any(|i| i == "-c" || i == "--colored" || i == "--color");
+        let supported_char_lists = HashMap::from([ // List of available char_lists to be used on conversion:
+            ("japanese", "ッツヅミテデトドナぁあぃいぅうぇえぉおかがきぎけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕゖ゛゜ゝゞゟ゠ァアィイカガキギクグケゲコゴサザシジスズセゼソゾタダチヂニヌネノハバパヒビピフブプヘベペホボポマムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶヷヸヹヺヾくぐゥウェエォオ、。"),
+            ("chinese", "厅和酒店等私空间安装面部识别摄像头在个案例中调查发现东南部福建省福州市的公安希望在美国酒店品牌戴斯酒店特许经营店的大堂内安装摄像头酒店前台经理告诉纽约时报摄像头没有脸识别功能也没有和公安网络联网文件显示福州市公安局还要求接家当地喜来登酒店内的视频监控资，。，。"),
+            ("russian", "АБВГДЕЁЖЗИЙКЛМНОПPСТУФХЦЧШЩЪЫЬЭЮЯ  "),
+            // ("hindi", "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहक्त्ज्ञ"), //this does not work bcuz hindi
+            // chars are dependent to each other, so there is no linear ratio!
+            // all lines has to contain same amount of pixels!
+            // but hindi chars have dependent width!
+            // thats why I am not doing it!
+            ("emoji", "😆😅🤣😉😊😋🤩😝🤑🤐🤗😛🧐😶😐🙄😠🤬😡😔🙁😫😩😮😱😨😰😯😓😭🤕🤢🤮🥵🥶🥳🥸😴💤🤡👹🦀👺💀👻👽👾😺🙀😿😾🙌🤛🤚👊🤞🤘👌🤏💪🦾🦿🤝🙏👆🖖💅🤳👄🦀👿🦀👅👂🦻👃🧠🫀🫁🦷🦴👁👀👤👥🗣👶🧔，。"),
+            ("ansi", "█▓▒░ "),
+            ("slight", "$@%8W*adpLY\\|){[?_~>!I:\"`.   "),
+        ]); // contains supported char_lists
 let print_help = || {
     println!(
         "   ~This program allows you to create ASCII art from any image (.png, .jpeg, .jpg ...)~
@@ -432,8 +504,8 @@ let mut y_init = 0; // newline counter
     })
 .collect();
 
-    regulated
-    }
+        regulated
+        }
 
 pub fn read_env_args() -> Vec<String> {
     let mut ret = Vec::new();
@@ -441,4 +513,6 @@ pub fn read_env_args() -> Vec<String> {
         ret.push(arg);
     }
     ret
+}
+
 }
