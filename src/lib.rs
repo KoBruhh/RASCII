@@ -1,4 +1,4 @@
-use ::image::{imageops::FilterType::Gaussian, GenericImageView, ImageError, Rgba, open};
+use ::image::{imageops::FilterType::Gaussian, open, ImageError, Rgba};
 
 use std::{collections::HashMap, env, process};
 
@@ -69,9 +69,9 @@ impl Img {
     }
 }
 
-pub mod command_line{
-    use std::env::args;
+pub mod command_line {
     use super::process;
+    use std::env::args;
     pub fn read_env_args() -> Vec<String> {
         args().into_iter().collect() // Idk if it's the best way to do it.
     }
@@ -88,14 +88,17 @@ pub mod search {
 
     #[derive(Debug)]
     pub struct SearchError(String); // custom error type that returns an error message.
-    
+
     impl fmt::Display for SearchError {
-        fn fmt (&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.0)
         }
     }
 
-    pub fn search_exact_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> bool {
+    pub fn search_exact_sub_command(
+        search_list: &Vec<&str>,
+        sub_command_list: &Vec<String>,
+    ) -> bool {
         let mut bool_list = Vec::with_capacity(search_list.len());
         for command in search_list {
             bool_list.push(sub_command_list.contains(&command.to_string()));
@@ -103,38 +106,61 @@ pub mod search {
         !bool_list.iter().any(|i| *i == false) // capturing false value if exists!
     }
 
-    pub fn search_any_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> bool {
+    pub fn search_any_sub_command(search_list: &Vec<&str>, sub_command_list: &Vec<String>) -> bool {
         let mut bool_list = Vec::with_capacity(search_list.len());
         for command in search_list {
             bool_list.push(sub_command_list.contains(&command.to_string()));
         }
         bool_list.iter().any(|i| *i == true) // capturing true value if exists!
     }
-    
-    pub fn index_exact_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> Result<Vec<(String, usize)>, SearchError> { // returns all subcommands and their indexes, If exists! Else it panics.
-        if !search_exact_sub_command(search_list, sub_command_list) { // if not all elements pair:
+
+    pub fn index_exact_sub_command(
+        search_list: &Vec<&str>,
+        sub_command_list: &Vec<String>,
+    ) -> Result<Vec<(String, usize)>, SearchError> {
+        // returns all subcommands and their indexes, If exists! Else it panics.
+        if !search_exact_sub_command(search_list, sub_command_list) {
+            // if not all elements pair:
             Err(SearchError(String::from("Keywords and search list does not match! You can only find indexes from existing keywords!")))
-        } // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
+        }
+        // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
         else {
-            let mut sub_command_index_list:Vec<(String, usize)> = Vec::with_capacity(search_list.len());
+            let mut sub_command_index_list: Vec<(String, usize)> =
+                Vec::with_capacity(search_list.len());
             search_list.iter().for_each(|key| {
-                sub_command_index_list.push((key.to_string(), sub_command_list.iter().position(|x| x == key).expect("Couldn't pair keyword! Lists doesn't match!") )); // it has to panic if lists does not pair!
+                sub_command_index_list.push((
+                    key.to_string(),
+                    sub_command_list
+                        .iter()
+                        .position(|x| x == key)
+                        .expect("Couldn't pair keyword! Lists doesn't match!"),
+                )); // it has to panic if lists does not pair!
             });
             Ok(sub_command_index_list)
         }
     }
 
-    pub fn index_any_sub_command(search_list: &Vec<&str>, sub_command_list:&Vec<String>) -> Result<usize, SearchError> { // returns the index of first satisfied subcommand, If exists!
-        if !search_any_sub_command(search_list, sub_command_list) { // If no pair:
+    pub fn index_any_sub_command(
+        search_list: &Vec<&str>,
+        sub_command_list: &Vec<String>,
+    ) -> Result<usize, SearchError> {
+        // returns the index of first satisfied subcommand, If exists!
+        if !search_any_sub_command(search_list, sub_command_list) {
+            // If no pair:
             Err(SearchError(String::from("Keywords and search list does not match! You can only find indexes from existing keywords!")))
-        } // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
+        }
+        // if you want to find an index! first you have to include the variable! This function has to have all of the variables used in search!
         else {
             for key in search_list {
                 if sub_command_list.iter().any(|i| i == key) {
-                    return Ok(sub_command_list.iter().position(|x| x == key).expect("Couldn't pair keyword! Lists doesn't match!")); // have to fix these panics later!
+                    return Ok(sub_command_list
+                        .iter()
+                        .position(|x| x == key)
+                        .expect("Couldn't pair keyword! Lists doesn't match!"));
+                    // have to fix these panics later!
                 }
-            };
-           Err(SearchError(String::from("Couldn't find a pair"))) // Default value will be mutated if any pairs gets detected.
+            }
+            Err(SearchError(String::from("Couldn't find a pair"))) // Default value will be mutated if any pairs gets detected.
         }
     }
 
@@ -146,17 +172,21 @@ pub mod search {
         fn test_search_any_sub_command() {
             let search_list_true = vec!["-h", "--help", "--path"];
             let search_list_false = vec!["--no-help-here", "--help", "--path"];
-            let sub_command_list= vec![String::from("-h")];
+            let sub_command_list = vec![String::from("-h")];
 
             assert!(search_any_sub_command(&search_list_true, &sub_command_list) == true);
             assert!(search_any_sub_command(&search_list_false, &sub_command_list) == false);
         }
-        
+
         #[test]
         fn test_search_exact_sub_command() {
             let search_list_true = vec!["-h", "--path"];
             let search_list_false = vec!["-h", "--help", "--path-is-absend"];
-            let sub_command_list= vec![String::from("-h"), String::from("--path"), String::from("--another-subcommand")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+            let sub_command_list = vec![
+                String::from("-h"),
+                String::from("--path"),
+                String::from("--another-subcommand"),
+            ]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match
 
             assert!(search_exact_sub_command(&search_list_true, &sub_command_list) == true);
             assert!(search_exact_sub_command(&search_list_false, &sub_command_list) == false);
@@ -167,19 +197,38 @@ pub mod search {
             let search_list_true = vec!["-h", "--path", "-no-sense"];
             let search_list_true_2 = vec!["--not_first", "--path", "-no-sense"];
             let search_list_false = vec!["--help", "--path-is-absend"];
-            let sub_command_list= vec![String::from("-h"), String::from("--path"), String::from("--another-subcommand")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+            let sub_command_list = vec![
+                String::from("-h"),
+                String::from("--path"),
+                String::from("--another-subcommand"),
+            ]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match
 
-            assert!(dbg!(index_any_sub_command(&search_list_true, &sub_command_list).unwrap()) == (String::from("-h"), 0_usize));
-            assert!(dbg!(index_any_sub_command(&search_list_true_2, &sub_command_list).unwrap()) == (String::from("--path"), 1_usize));
+            assert!(
+                dbg!(index_any_sub_command(&search_list_true, &sub_command_list).unwrap())
+                    == (String::from("-h"), 0_usize)
+            );
+            assert!(
+                dbg!(index_any_sub_command(&search_list_true_2, &sub_command_list).unwrap())
+                    == (String::from("--path"), 1_usize)
+            );
         }
         #[test]
         fn test_index_exact_sub_command() {
             let search_list_true = vec!["-h", "--path"];
             let search_list_true_2 = vec!["-h"];
-            let sub_command_list= vec![String::from("-h"), String::from("--path")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match 
+            let sub_command_list = vec![String::from("-h"), String::from("--path")]; // it doesn't matter how much do you have in subcommand_list, We just want to know that all of searchs have a match
 
-            assert!(dbg!(index_exact_sub_command(&search_list_true, &sub_command_list).unwrap()) == vec![(String::from("-h"), 0_usize), (String::from("--path"), 1_usize)]);
-            assert!(dbg!(index_exact_sub_command(&search_list_true_2, &sub_command_list).unwrap() == vec![(String::from("-h"), 0_usize)]));
+            assert!(
+                dbg!(index_exact_sub_command(&search_list_true, &sub_command_list).unwrap())
+                    == vec![
+                        (String::from("-h"), 0_usize),
+                        (String::from("--path"), 1_usize)
+                    ]
+            );
+            assert!(dbg!(
+                index_exact_sub_command(&search_list_true_2, &sub_command_list).unwrap()
+                    == vec![(String::from("-h"), 0_usize)]
+            ));
             // false option is going to be tested after I clear expect(...) -> It panics now!
         }
     }
@@ -187,42 +236,271 @@ pub mod search {
 
 mod image {
     use super::*;
-    fn open_img(path:&str, ratio:usize) -> Result<Img, ImageError> {
+    pub fn open_img(
+        path: &str,
+        ratio: usize,
+        colored: bool,
+        is_cubic_char: bool,
+        pixelated: bool,
+        full_background: bool,
+    ) -> Result<Img, ImageError> {
+        // Ik it is a dirty solution!
+        // the reason signature is that big is to know if the img path contains any of these tags
         let mut img = image::open(path)?;
-        // if !input_is_cubic_char {
-        //     img = img.resize_exact(img.width(), img.height() / 2, Gaussian);
-        // }
+        if !is_cubic_char {
+            img = img.resize_exact(img.width(), img.height() / 2, Gaussian);
+        }
+        if !pixelated && !full_background {
+            img = img.resize_exact(
+                img.width() * ratio as u32 / 100,
+                img.height() * ratio as u32 / 100,
+                Gaussian,
+            );
+        } else if colored {
+            img = img.resize_exact(
+                img.width() * ratio as u32 / 200,
+                img.height() * ratio as u32 / 100,
+                Gaussian,
+            );
+        }
 
         let mut result: Img = Img::new();
-        let pixels: Vec<(u32, u32, Rgba(u8, u8, u8, u8))> = img.pixels().into_iter().collect();
 
         Ok::<Img, ImageError>(result)
-}
+    }
 }
 
 pub mod prelude {
     use super::*;
-    const builtin_char_map:HashMap<&str,&str> = HashMap::from([ // List of available char_lists to be used on conversion:
-        ("default", "..."),
-        ("japanese", "ッツヅミテデトドナぁあぃいぅうぇえぉおかがきぎけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕゖ゛゜ゝゞゟ゠ァアィイカガキギクグケゲコゴサザシジスズセゼソゾタダチヂニヌネノハバパヒビピフブプヘベペホボポマムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶヷヸヹヺヾくぐゥウェエォオ、。"),
-        ("chinese", "厅和酒店等私空间安装面部识别摄像头在个案例中调查发现东南部福建省福州市的公安希望在美国酒店品牌戴斯酒店特许经营店的大堂内安装摄像头酒店前台经理告诉纽约时报摄像头没有脸识别功能也没有和公安网络联网文件显示福州市公安局还要求接家当地喜来登酒店内的视频监控资，。，。"),
-        ("russian", "АБВГДЕЁЖЗИЙКЛМНОПPСТУФХЦЧШЩЪЫЬЭЮЯ  "),
-        //         // ("hindi", "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहक्त्ज्ञ"), //this does not work bcuz hindi
-        //         // chars are dependent to each other, so there is no linear ratio!
-        //         // all lines has to contain same amount of pixels!
-        //         // but hindi chars have dependent width!
-        //         // thats why I am not doing it!
-        ("emoji", "😆😅🤣😉😊😋🤩😝🤑🤐🤗😛🧐😶😐🙄😠🤬😡😔🙁😫😩😮😱😨😰😯😓😭🤕🤢🤮🥵🥶🥳🥸😴💤🤡👹🦀👺💀👻👽👾😺🙀😿😾🙌🤛🤚👊🤞🤘👌🤏💪🦾🦿🤝🙏👆🖖💅🤳👄🦀👿🦀👅👂🦻👃🧠🫀🫁🦷🦴👁👀👤👥🗣👶🧔，。"),
-        ("ansi", "█▓▒░ "),
-        ("slight", "$@%8W*adpLY\\|){[?_~>!I:\"`.   "),
-    ]); // contains supported char_lists
-    pub fn convert_with_color(path:&str, color:[u8;3], list:&str /*char_list_name*/ , ratio:usize) -> String {
-        let list = if let Some(list) = builtin_char_map.get(list) 
-        {list} else {list}; // so much lists!
-        let is_cubic_char = if list == "japanese" || list == "chinese" || list == "emoji" { // these are cubic characters
-            true
-        } else {false};
-        ;
+    use crate::command_line::print_and_exit;
+
+    // error messages:
+    const image_open_error: &str = "could not open image file from the path!";
+    const unvalid_path_or_list_input_error: &str = "You entered an unvalid path!
+             If your path has white_spaces, you have to change the name of the file!
+             Exmpl:
+                 rascii -p Img (1).jpeg -> unvalid!
+                 rascii -p Img(1).jpeg -> valid!
+
+             Also:
+                 you cannot add ½¾$£ etc. characters to your custom list!
+             Exmpl:
+                 rascii -p <path/to/img> -l $#$½£ -> unvalid!
+                 rascii -p <path/to/img> -l 123qe.:,- -> valid!";
+    // constant lists used in program:
+
+    // let appearance = img.take_appearance();
+
+    // let mut regulated: XyIRgb = Vec::with_capacity(appearance.len());
+    // for i in appearance.iter() {
+    // let ((x, y), (r, g, b, a)) = i;
+    // let fine = (
+    //     (*x, *y),
+    //     *r as f64 / 1020_f64
+    //     + *g as f64 / 1020_f64
+    //     + *b as f64 / 1020_f64
+    //     + *a as f64 / 1020_f64,
+    //     (*r, *g, *b),
+    // ); // 1020 is 255*4 , when i sum them out,  I want to use them as 0-1 decimal numbers.
+    // regulated.push(fine);
+    // }
+
+    // let mut y_init = 0; // newline counter
+    // let regulated: String = regulated
+    // .iter()
+    // .map(|i| {
+    //     let index = if !reverse {
+    //         (i.1 * (char_list.chars().count() - 1) as f64) as usize
+    //     } else {
+    //         (char_list.chars().count() - 1)
+    //             - (i.1 * (char_list.chars().count() - 1) as f64) as usize
+    //     };
+    //     let ascii_char = char_list
+    //         .chars()
+    //         .nth(index)
+    //         .unwrap_or_else(|| {
+    //             eprintln!(
+    //                 "
+    // You entered an unvalid path!
+    //     If your path has white_spaces, you have to change the name of the file!
+    //     Exmpl:
+    //         rascii -p Img (1).jpeg -> unvalid!
+    //         rascii -p Img(1).jpeg -> valid!
+
+    //     Also:
+    //         you cannot add ½¾$£ etc. characters to your custom list!
+    //     Exmpl:
+    //         rascii -p <path/to/img> -l $#$½£ -> unvalid!
+    //         rascii -p <path/to/img> -l 123qe.:,- -> valid!"
+    //             );
+    //             process::exit(1);
+    //         })
+    //     .to_string();
+    //     if i.0 .1 > y_init {
+    //         /* the y value of pixel */
+    //         y_init = i.0 .1;
+    //         if !colored && !with_color {
+    //             print!("\n{}", ascii_char);
+    //             return stringify!("\n{}", ascii_char);
+    //         } else {
+    //             let (r, g, b) = i.2;
+    //             if !pixelated && !full_background && !with_color {
+    //                 let result = format!("\n\x1b[38;2;{r};{g};{b}m{}", ascii_char);
+    //                 print!("{result}");
+    //                 return stringify!(result);
+    //             }
+    //             if pixelated {
+    //                 let result = format!(
+    //                     "\n\x1b[48;2;{r};{g};{b}m \x1b[38;2;{r};{g};{b}m{content}\x1b[0m",
+    //                     content = ascii_char
+    //                 );
+    //                 print!("{result}");
+    //                 return stringify!(result);
+    //             }
+    //             if full_background {
+    //                 let result = format!(
+    //                     "\n\x1b[48;2;{r};{g};{b}m \x1b[38;2;{};{};{}m{}\x1b[0m",
+    //                     &text_color[0], &text_color[1], text_color[2], ascii_char
+    //                 );
+    //                 print!("{result}");
+    //                 return stringify!(result);
+    //             }
+    //             if with_color {
+    //                 let result = format!(
+    //                     "\n\x1b[38;2;{};{};{}m{}",
+    //                     &text_color[0], &text_color[1], &text_color[2], ascii_char
+    //                 );
+    //                 print!("{result}");
+    //                 return stringify!(result);
+    //             }
+    //         }
+    //     }
+
+    //     if !colored && !with_color {
+    //         print!("{ascii_char}");
+    //         stringify!(ascii_char)
+    //     } else {
+    //         let (r, g, b) = i.2;
+    //         if !pixelated && !full_background && !with_color {
+    //             let result = format!("\x1b[38;2;{r};{g};{b}m{}", ascii_char);
+    //             print!("{result}");
+    //             return stringify!(result);
+    //         }
+    //         if pixelated {
+    //             let result = format!(
+    //                 "\x1b[48;2;{r};{g};{b}m \x1b[38;2;{r};{g};{b}m{content}\x1b[0m",
+    //                 content = ascii_char
+    //             );
+    //             print!("{result}");
+    //             return stringify!(result);
+    //         }
+    //         if full_background {
+    //             let result = format!(
+    //                 "\x1b[48;2;{r};{g};{b}m \x1b[38;2;{};{};{}m{}\x1b[0m",
+    //                 &text_color[0], &text_color[1], text_color[2], ascii_char
+    //             );
+    //             print!("{result}");
+    //             return stringify!(result);
+    //         }
+    //         if with_color {
+    //             let result = format!(
+    //                 "\x1b[38;2;{};{};{}m{}",
+    //                 &text_color[0], &text_color[1], &text_color[2], ascii_char
+    //             );
+    //             print!("{result}");
+    //             stringify!(result)
+    //         } else {
+    //             eprintln!("Impossible! report on github issues!");
+    //             process::exit(1);
+    //         }
+    //     }
+    // })
+    // .collect();
+
+    pub fn convert_to_colored_ascii(
+        path: &str,
+        color: [u8; 3],
+        list: &str, /*char_list_name*/
+        ratio: usize,
+        reverse: bool,
+    ) -> String {
+        let cubic_char_lists: Vec<&str> = vec!["japanese", "chinese", "emoji"];
+        let builtin_char_map:HashMap<&str,&str> = HashMap::from([ // List of available char_lists to be used on conversion:
+            ("default", "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'.    "),
+            ("japanese", "ッツヅミテデトドナぁあぃいぅうぇえぉおかがきぎけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをんゔゕゖ゛゜ゝゞゟ゠ァアィイカガキギクグケゲコゴサザシジスズセゼソゾタダチヂニヌネノハバパヒビピフブプヘベペホボポマムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶヷヸヹヺヾくぐゥウェエォオ、。"),
+            ("chinese", "厅和酒店等私空间安装面部识别摄像头在个案例中调查发现东南部福建省福州市的公安希望在美国酒店品牌戴斯酒店特许经营店的大堂内安装摄像头酒店前台经理告诉纽约时报摄像头没有脸识别功能也没有和公安网络联网文件显示福州市公安局还要求接家当地喜来登酒店内的视频监控资，。，。"),
+            ("russian", "АБВГДЕЁЖЗИЙКЛМНОПPСТУФХЦЧШЩЪЫЬЭЮЯ  "),
+            //         // ("hindi", "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहक्त्ज्ञ"), //this does not work bcuz hindi
+            //         // chars are dependent to each other, so there is no linear ratio!
+            //         // all lines has to contain same amount of pixels!
+            //         // but hindi chars have dependent width!
+            //         // thats why I am not doing it!
+            ("emoji", "😆😅🤣😉😊😋🤩😝🤑🤐🤗😛🧐😶😐🙄😠🤬😡😔🙁😫😩😮😱😨😰😯😓😭🤕🤢🤮🥵🥶🥳🥸😴💤🤡👹🦀👺💀👻👽👾😺🙀😿😾🙌🤛🤚👊🤞🤘👌🤏💪🦾🦿🤝🙏👆🖖💅🤳👄🦀👿🦀👅👂🦻👃🧠🫀🫁🦷🦴👁👀👤👥🗣👶🧔，。"),
+            ("ansi", "█▓▒░ "),
+            ("slight", "$@%8W*adpLY\\|){[?_~>!I:\"`.   "),
+        ]); // contains supported char_lists
+        let list = if let Some(custom_list) = builtin_char_map.get(list) {
+            custom_list
+        } else {
+            list
+        }; // returns list when any valid input is given. otherwise list arg is the charlist.
+        let is_cubic_char: bool = cubic_char_lists.iter().any(|i| *i == list); // figures if the given input is cubic.
+        let img =
+            image::open_img(path, ratio, true, is_cubic_char, false, false).unwrap_or_else(|_| {
+                // uses true bcuz it converts with color!
+                print_and_exit(image_open_error)
+            });
+
+        // let pixels: Vec<(u32, u32, Rgba<(u8, u8, u8, u8)>)> = img.pixels().into_iter().collect();
+        let appearance = img.take_appearance();
+        let mut regulated: Vec<XyIRgb> = Vec::with_capacity(appearance.len());
+        appearance.iter().for_each(|i| {
+            let ((x, y), (r, g, b, a)) = i;
+            regulated.push((
+                (*x, *y),
+                *r as f64 / 1020_f64
+                    + *g as f64 / 1020_f64
+                    + *b as f64 / 1020_f64
+                    + *a as f64 / 1020_f64,
+                (*r, *g, *b),
+            )); // 1020 is 255*4 , when i sum them out,  I want to use them as 0-1 decimal numbers.
+        });
+        let mut y_init = 0; // newline counter
+        let regulated: String = regulated
+            .iter()
+            .map(|i| {
+                let index = if !reverse {
+                    (i.1 * (list.chars().count() - 1) as f64) as usize
+                } else {
+                    (list.chars().count() - 1) - (i.1 * (list.chars().count() - 1) as f64) as usize
+                };
+                let ascii_char = list
+                    .chars()
+                    .nth(index)
+                    .unwrap_or_else(|| {
+                        print_and_exit(unvalid_path_or_list_input_error);
+                        process::exit(1);
+                    }); // <- semicolon added for debugging!
+                    // .to_string();
+                let (r, g, b) = i.2;
+                eprintln!("{r}, {g}, {b}");
+                if i.0.1 > y_init {
+                    /* the y value of pixel */
+                    y_init = i.0.1;
+                    let result = format!("\n\x1b[38;2;{r};{g};{b}m{ascii_char}\x1b[0m");
+                    print!("{result}");
+                    return stringify!(result);
+                }
+                    let result = format!("\x1b[38;2;{r};{g};{b}m{ascii_char}\x1b[0m");
+                    print!("{result}");
+                    stringify!(result)
+            })
+            .collect();
+        regulated
+    }
+
+    pub fn convert_to_ascii() -> String {
+        unimplemented!();
     }
     // pub fn convert() -> String {
     //                 let pixelated = sub_commands
@@ -280,10 +558,10 @@ pub mod prelude {
     // }; // printing help to std::out
     // if sub_commands.iter().any(|i| i == "-h" || i == "--help") {
     // print_help();
-// }
+    // }
 
     // let path = if sub_commands
-// .iter()
+    // .iter()
     // .any(|i| (i == "-p" || i == "--path") && (i != "-h" || i != "--help"))
     // {
     //     &sub_commands[&sub_commands
@@ -375,7 +653,7 @@ pub mod prelude {
     //     }
     // }
     // list_info // returns list_info bcuz no pair detected! This allows you to enter your own lists stored on terminal environment variables or directly from -l <your_char_list>
-// } else {
+    // } else {
     // "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'.    "
     //     // currently 70 elements. But you can modify this list and code will adapt to it.
     // };
@@ -554,5 +832,4 @@ pub mod prelude {
     // }
     // ret
     // }
-
 }
